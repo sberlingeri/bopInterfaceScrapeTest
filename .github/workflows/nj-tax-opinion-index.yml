@@ -1,0 +1,56 @@
+name: Build NJ Tax Court Opinion Index
+
+on:
+  push:
+    branches:
+      - nj-tax-opinion-index
+    paths:
+      - tools/nj_tax_opinion_index.py
+      - .github/workflows/nj-tax-opinion-index.yml
+  pull_request:
+    paths:
+      - tools/nj_tax_opinion_index.py
+      - .github/workflows/nj-tax-opinion-index.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: "1"
+  NJ_TAX_WORKERS: "6"
+  NJ_TAX_APPELLATE_QUERY_CAP: "5000"
+
+jobs:
+  build-index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install scraper dependencies
+        run: python -m pip install --disable-pip-version-check requests beautifulsoup4 lxml
+
+      - name: Build comprehensive index
+        run: python tools/nj_tax_opinion_index.py
+
+      - name: Show generated metadata
+        if: always()
+        run: |
+          find output/nj_tax_opinion_index -maxdepth 1 -type f -printf '%f %s bytes\n' || true
+          cat output/nj_tax_opinion_index/metadata.json || true
+
+      - name: Upload index artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nj-tax-opinion-index
+          path: output/nj_tax_opinion_index/
+          if-no-files-found: warn
+          retention-days: 7
