@@ -17,9 +17,12 @@ jobs:
       - name: Fetch public search page
         run: |
           mkdir -p output/rutgers-inspect
-          curl -L --fail --max-time 90 -A 'Mozilla/5.0' 'https://njlaw.rutgers.edu/courts/' -o output/rutgers-inspect/courts.html
+          curl -k -L --max-time 90 -A 'Mozilla/5.0' -D output/rutgers-inspect/headers.txt 'https://njlaw.rutgers.edu/courts/' -o output/rutgers-inspect/courts.html 2> output/rutgers-inspect/curl-error.txt || true
           grep -inE '<form|<input|<select|<option|<script' output/rutgers-inspect/courts.html > output/rutgers-inspect/forms.txt || true
+          wc -c output/rutgers-inspect/* || true
+          cat output/rutgers-inspect/headers.txt || true
           head -200 output/rutgers-inspect/forms.txt || true
+          exit 0
       - uses: actions/upload-artifact@v4
         if: always()
         with:
