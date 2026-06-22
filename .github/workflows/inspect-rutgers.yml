@@ -1,0 +1,33 @@
+name: Inspect Rutgers court search
+on:
+  push:
+    branches: [nj-tax-opinion-index]
+    paths: [.github/workflows/inspect-rutgers.yml]
+  pull_request:
+    paths: [.github/workflows/inspect-rutgers.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe public Tax Court search
+        run: |
+          mkdir -p output/rutgers-inspect
+          base='https://njlaw.rutgers.edu/courts/search.php'
+          for spec in 'star:%2A' 'the:the' 'lettera:a' 'statute:54%3A' 'tax:tax' 'blank:%20'; do
+            name=${spec%%:*}; q=${spec#*:}
+            curl -k -L --max-time 90 -A 'Mozilla/5.0' "$base?q=$q&court=tax&page=1&limit=100" -o "output/rutgers-inspect/$name.html" 2> "output/rutgers-inspect/$name.err" || true
+            printf '%s bytes=' "$name"; wc -c < "output/rutgers-inspect/$name.html" || true
+            grep -ioE '([0-9,]+ results|page [0-9]+ of [0-9]+|[0-9,]+ opinions)' "output/rutgers-inspect/$name.html" | head -10 || true
+          done
+          exit 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rutgers-search-inspect
+          path: output/rutgers-inspect/
+          retention-days: 3

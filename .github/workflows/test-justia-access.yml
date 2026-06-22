@@ -1,0 +1,68 @@
+name: Test Justia browser access
+
+on:
+  push:
+    branches: [nj-tax-opinion-index]
+    paths: [.github/workflows/test-justia-access.yml]
+  pull_request:
+    paths: [.github/workflows/test-justia-access.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Playwright Chromium
+        run: |
+          python -m pip install --disable-pip-version-check playwright
+          python -m playwright install --with-deps chromium
+      - name: Navigate as an ordinary browser
+        shell: bash
+        run: |
+          mkdir -p output/access-test
+          cat > /tmp/test_browser.py <<'PY'
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+
+          out = Path('output/access-test')
+          url = 'https://law.justia.com/cases/new-jersey/tax-court/2025/'
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True)
+              context = browser.new_context(
+                  viewport={'width': 1440, 'height': 1000},
+                  locale='en-US',
+                  timezone_id='America/New_York',
+                  user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              )
+              page = context.new_page()
+              try:
+                  page.goto(url, wait_until='domcontentloaded', timeout=120_000)
+              except Exception as exc:
+                  print('goto error:', repr(exc))
+              for seconds in (5, 10, 20, 35):
+                  page.wait_for_timeout((seconds - (0 if seconds == 5 else {10:5,20:10,35:20}[seconds])) * 1000)
+                  print(seconds, 'seconds:', page.title(), page.url, len(page.content()))
+                  if 'New Jersey Tax Court' in page.content() and 'Just a moment' not in page.title():
+                      break
+              out.joinpath('browser.html').write_text(page.content(), encoding='utf-8')
+              out.joinpath('browser.txt').write_text(page.locator('body').inner_text(), encoding='utf-8')
+              page.screenshot(path=str(out / 'browser.png'), full_page=True)
+              browser.close()
+          PY
+          python /tmp/test_browser.py
+          wc -c output/access-test/*
+          head -80 output/access-test/browser.txt || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: justia-browser-access-test
+          path: output/access-test/
+          retention-days: 2
