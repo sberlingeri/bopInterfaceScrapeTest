@@ -1,0 +1,28 @@
+name: Inspect Rutgers court search
+on:
+  push:
+    branches: [nj-tax-opinion-index]
+    paths: [.github/workflows/inspect-rutgers.yml]
+  pull_request:
+    paths: [.github/workflows/inspect-rutgers.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch public search page
+        run: |
+          mkdir -p output/rutgers-inspect
+          curl -L --fail --max-time 90 -A 'Mozilla/5.0' 'https://njlaw.rutgers.edu/courts/' -o output/rutgers-inspect/courts.html
+          grep -inE '<form|<input|<select|<option|<script' output/rutgers-inspect/courts.html > output/rutgers-inspect/forms.txt || true
+          head -200 output/rutgers-inspect/forms.txt || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rutgers-search-inspect
+          path: output/rutgers-inspect/
+          retention-days: 3
