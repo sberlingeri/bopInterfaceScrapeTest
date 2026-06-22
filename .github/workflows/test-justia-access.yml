@@ -4,6 +4,8 @@ on:
   push:
     branches: [nj-tax-opinion-index]
     paths: [.github/workflows/test-justia-access.yml]
+  pull_request:
+    paths: [.github/workflows/test-justia-access.yml]
   workflow_dispatch:
 
 permissions:
