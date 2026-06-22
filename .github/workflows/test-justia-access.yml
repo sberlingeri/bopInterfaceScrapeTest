@@ -1,0 +1,32 @@
+name: Test Justia access
+
+on:
+  push:
+    branches: [nj-tax-opinion-index]
+    paths: [.github/workflows/test-justia-access.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test direct and reader endpoints
+        shell: bash
+        run: |
+          set -x
+          mkdir -p output/access-test
+          curl -L --max-time 90 -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36' -o output/access-test/direct.html -w '%{http_code}\n' 'https://law.justia.com/cases/new-jersey/tax-court/2025/' || true
+          curl -L --max-time 90 -A 'Mozilla/5.0' -o output/access-test/jina.txt -w '%{http_code}\n' 'https://r.jina.ai/http://law.justia.com/cases/new-jersey/tax-court/2025/' || true
+          wc -c output/access-test/* || true
+          head -40 output/access-test/jina.txt || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: justia-access-test
+          path: output/access-test/
+          retention-days: 2
